@@ -1,10 +1,12 @@
+from random import randint
+
 from django.core.management import BaseCommand
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
-from telegram.ext import CallbackQueryHandler, MessageHandler, BaseFilter
+from telegram.ext import CallbackQueryHandler, MessageHandler, BaseFilter, Filters
 from telegram.ext import Updater, CommandHandler
 import logging
 from bot import settings
-from core.models import Service
+from core.models import Service, User, UserActivity
 
 updater = Updater(settings.bot, use_context=True)
 dispatcher = updater.dispatcher
@@ -13,12 +15,23 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 
 
+def user_handler(telegram_id, telegram_username, action):
+    user = User.objects.get_or_create(telegram_id=telegram_id, username=telegram_username)
+    if user[1] is False:
+        u_a = UserActivity.objects.filter(user__username=user[0].username)
+        u_a.update(action=action)
+
+    UserActivity.objects.create(user=user[0], action=action)
+
+
 def start(update, context):
     update.message.reply_text(
         text="سلام🧑🏻‍⚕️👩🏻‍⚕️ \n به ربات کلینیک زیبایی نای ذی خوش آمدید",
         reply_markup=ReplyKeyboardMarkup([['آدرس', 'شماره تماس'], ['اینستاگرام', 'وب سایت'], ['خدمات']],
                                          one_time_keyboard=True)
     )
+
+    user_handler(update.message.chat.id, update.message.chat.username, action='start')
 
 
 def create_question_layout(response, update):
@@ -48,34 +61,45 @@ def update_question(response, query):
     )
 
 
-def inline_query(update, _):
+def inline_query(update, context):
     # user = User.objects.get(telegram_id=update.callback_query.message.chat.id)
     if 'service__' in update.callback_query.data:
         service_id = update.callback_query.data.split('__')[1]
         service = Service.objects.get(pk=service_id)
-        update.callback_query.message.reply_text('👍🏿')
+        # update.callback_query.message.reply_text()
+        service_sticker_count = len(service.images.all())
 
         # update.callback_query.answer()
         update_question(service.title, update.callback_query)
         # create_question_layout(service.title, update)
 
+        for i in service.images.all():
+            context.bot.send_sticker(chat_id=update.effective_chat.id, sticker=i.image)
+
+        context.bot.send_message(chat_id=update.effective_chat.id,
+                                 text="عکس هایی تو این زاویه که فرستادیم برات از خودت بگیر و همینجا بفرس برامون")
+
 
 def address(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="بلوار آفریقا - خیابان شریفی - پ19 - ط2")
     context.bot.send_location(chat_id=update.effective_chat.id, latitude=35.759400, longitude=51.412237)
+    user_handler(update.message.chat.id, update.message.chat.username, action='get_contact_us')
 
 
 def instagram(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="https://instagram.com/nayziclinic")
+    user_handler(update.message.chat.id, update.message.chat.username, action='get_contact_us')
 
 
 def website(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="https://nayziclinic.com")
+    user_handler(update.message.chat.id, update.message.chat.username, action='get_contact_us')
 
 
 def contact_us(update, context):
     context.bot.send_contact(chat_id=update.effective_chat.id, first_name='کلینیک زیبایی نای ذی',
                              phone_number=+982191001919)
+    user_handler(update.message.chat.id, update.message.chat.username, action='get_contact_us')
 
 
 # def button(update, context):
@@ -104,6 +128,15 @@ def service(update, _):
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(text='خدماتی که می خوای رو انتخاب کن:', reply_markup=reply_markup)
     # UserActivity.objects.log_user_select_popular_stories(user=user)
+
+
+def reply_photo_to_stickers(update, context):
+    if update.message.photo:
+        new_file = context.bot.get_file(update.message.photo[-1].file_id)
+        rand = randint(0, 99999999)
+
+        new_file.download('user_reply_to_stickers_' + str(update.effective_chat.id) + '_' + str(rand) + '.jpg')
+        context.bot.send_message(chat_id=update.effective_chat.id, text="https://nayziclinic.com")
 
 
 class AddressFilter(BaseFilter):
@@ -148,6 +181,8 @@ class Command(BaseCommand):
         dispatcher.add_handler(website_handler_text)
         service_handler_text = MessageHandler(ServiceFilter(), service)
         dispatcher.add_handler(service_handler_text)
+
+        dispatcher.add_handler(MessageHandler(Filters.photo, reply_photo_to_stickers))
 
         updater.start_polling()
         updater.idle()

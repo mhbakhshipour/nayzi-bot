@@ -177,4 +177,18 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = '/statics/'
+MEDIA_URL = '/medias/'
+# STATIC_ROOT = os.path.join(BASE_DIR, 'statics')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'medias')
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "statics")
+]
+
+UPLOAD_DIRECTORIES = {
+    'service_sticker': 'service_sticker',
+    'user_photo': 'user_photo',
+}
+
+AUTH_USER_MODEL = 'core.User'
