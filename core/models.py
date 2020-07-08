@@ -101,7 +101,7 @@ class UserActivity(models.Model):
     )
     user = models.ForeignKey(to="User", on_delete=models.CASCADE, verbose_name=_('user'))
     action = models.CharField(_('action'), max_length=255, choices=action_choices)
-    services = models.ManyToManyField(verbose_name='services', to="Service", related_name='user_services')
+    services = models.ManyToManyField(verbose_name='services', to="UserService", related_name='user_services')
     date = models.DateTimeField(auto_now_add=True, verbose_name=_('created_at'))
 
     objects = UserActivityManager()
@@ -145,3 +145,28 @@ class Service(models.Model):
         db_table = 'services'
         verbose_name = _('service')
         verbose_name_plural = _('services')
+
+
+class UserService(models.Model):
+    user = models.ForeignKey(to="User", on_delete=models.CASCADE, verbose_name=_('user'))
+    services = models.ForeignKey(to="Service", on_delete=models.CASCADE, verbose_name=_('services'))
+    images = models.ManyToManyField(verbose_name=_('images'), to="UserServiceImage", related_name='user_service_image')
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+
+    def __str__(self):
+        return self.user.username + 'سرویس: ' + self.services.title
+
+    class Meta:
+        db_table = 'user_services'
+        verbose_name = _('user_service')
+        verbose_name_plural = _('user_services')
+
+
+class UserServiceImage(models.Model):
+    image = models.ImageField(verbose_name=_('image'), blank=False, null=False, upload_to=settings.UPLOAD_DIRECTORIES['user_service_image'])
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+
+    class Meta:
+        db_table = 'user_service_images'
+        verbose_name = _('user_service_image')
+        verbose_name_plural = _('user_service_images')

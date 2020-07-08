@@ -1,18 +1,26 @@
+import re
 from random import randint
+from time import sleep
 
 from django.core.management import BaseCommand
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import CallbackQueryHandler, MessageHandler, BaseFilter, Filters
 from telegram.ext import Updater, CommandHandler
 import logging
 from bot import settings
-from core.models import Service, User, UserActivity
+from core.models import Service, User, UserActivity, UserService, UserServiceImage
 
 updater = Updater(settings.bot, use_context=True)
 dispatcher = updater.dispatcher
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
+
+KEYBOARD_MARKUPS = {
+    'MENU': [['آدرس', 'شماره تماس'], ['اینستاگرام', 'وب سایت'], ['خدمات']],
+    'COMPLETED': [['تمام شد']],
+    'NEXT': [['بعدی']],
+}
 
 
 def user_handler(telegram_id, telegram_username, action):
@@ -27,7 +35,7 @@ def user_handler(telegram_id, telegram_username, action):
 def start(update, context):
     update.message.reply_text(
         text="سلام🧑🏻‍⚕️👩🏻‍⚕️ \n به ربات کلینیک زیبایی نای ذی خوش آمدید",
-        reply_markup=ReplyKeyboardMarkup([['آدرس', 'شماره تماس'], ['اینستاگرام', 'وب سایت'], ['خدمات']],
+        reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS['MENU'],
                                          one_time_keyboard=True)
     )
 
@@ -61,58 +69,124 @@ def update_question(response, query):
     )
 
 
+def get_contact_user(update, context):
+    # context.bot.send_message(chat_id=update.effective_chat.id, text="شماره و ایمیلتو تو 2 تا پیام بده عمو ببینه")
+    dispatcher.add_handler(MessageHandler(Filters.regex('^09[0-9]{9}$'), get_cellphone_number))
+
+    dispatcher.add_handler(
+        MessageHandler(Filters.regex('^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'), get_email_address))
+
+
+def user_request_service(update, context, user, service, service_sticker_count):
+    def reply_photo_to_stickers(update, context):
+        if update.message.photo:
+            user_service = UserService.objects.get(user=user, services=service)
+
+            new_file = context.bot.get_file(update.message.photo[-1].file_id)
+            i = new_file.download('medias/user_service_image/' + str(update.effective_chat.id) + '.jpg')
+            img = UserServiceImage.objects.create(image=i.split('medias/')[1])
+            user_service.images.add(img)
+
+            user_service = UserService.objects.get(user=user, services=service)
+            user_service_image_count = len(user_service.images.all())
+            context.bot.send_message(chat_id=update.effective_chat.id,
+                                     text="عکس شما دریافت شد. لطفا روی دکمه بزنید",
+                                     reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS[
+                                                                          'COMPLETED' if user_service_image_count == service_sticker_count else 'NEXT'],
+                                                                      one_time_keyboard=True)
+                                     )
+
+    def send_stickers():
+        update_question(service.title, update.callback_query)
+        # create_question_layout(service.title, update)
+
+        for i in service.images.all():
+            context.bot.send_sticker(chat_id=update.effective_chat.id, sticker=i.image)
+        context.bot.send_message(chat_id=update.effective_chat.id,
+                                 text="عکس هایی تو این زاویه که فرستادیم برات از خودت بگیر و همینجا بفرس برامون \n وقتی فرستادی روی بعدی/تمام شد بزن")
+        # get_image(update, context, service_sticker_count, user_service, update.callback_query.data)
+
+    if UserService.objects.filter(user=user, services=service).exists() is True:
+        user_service = UserService.objects.get(user=user, services=service)
+        user_service_image_count = len(user_service.images.all())
+        if user_service_image_count < service_sticker_count:
+            send_stickers()
+            dispatcher.add_handler(MessageHandler(Filters.photo, reply_photo_to_stickers))
+        else:
+            context.bot.send_message(chat_id=update.effective_chat.id,
+                                     text="شما قبلا درخواست داده اید. لطفا با پشتیبانی تماس حاصل فرمایید.")
+            contact_us(update, context)
+    else:
+        user_service = UserService.objects.create(user=user, services=service)
+        send_stickers()
+        dispatcher.add_handler(MessageHandler(Filters.photo, reply_photo_to_stickers))
+
+
 def inline_query(update, context):
-    # user = User.objects.get(telegram_id=update.callback_query.message.chat.id)
+    user = User.objects.get(telegram_id=update.callback_query.message.chat.id)
     if 'service__' in update.callback_query.data:
         service_id = update.callback_query.data.split('__')[1]
         service = Service.objects.get(pk=service_id)
         # update.callback_query.message.reply_text()
         service_sticker_count = len(service.images.all())
 
+        user_request_service(update, context, user, service, service_sticker_count)
+
         # update.callback_query.answer()
-        update_question(service.title, update.callback_query)
-        # create_question_layout(service.title, update)
 
-        for i in service.images.all():
-            context.bot.send_sticker(chat_id=update.effective_chat.id, sticker=i.image)
 
-        context.bot.send_message(chat_id=update.effective_chat.id,
-                                 text="عکس هایی تو این زاویه که فرستادیم برات از خودت بگیر و همینجا بفرس برامون")
+def get_cellphone_number(update, context):
+    if update.message.text:
+        context.bot.send_message(chat_id=update.effective_chat.id, text="ای جان اینم شماره")
+
+
+def get_email_address(update, context):
+    if update.message.text:
+        context.bot.send_message(chat_id=update.effective_chat.id, text="ای جان اینم ایمیل")
 
 
 def address(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="بلوار آفریقا - خیابان شریفی - پ19 - ط2")
     context.bot.send_location(chat_id=update.effective_chat.id, latitude=35.759400, longitude=51.412237)
-    user_handler(update.message.chat.id, update.message.chat.username, action='get_contact_us')
 
 
 def instagram(update, context):
+    # query = update.callback_query
+    # contact_keyboard = KeyboardButton(text="شمارمو بده عمو", request_contact=True)
+    # reply_markup = ReplyKeyboardMarkup([[contact_keyboard]])
+    # update.message.reply_text("شمارتو بده عمو ببینه", reply_markup=reply_markup)
+    # print(update.message.contact.phone_number)
     context.bot.send_message(chat_id=update.effective_chat.id, text="https://instagram.com/nayziclinic")
-    user_handler(update.message.chat.id, update.message.chat.username, action='get_contact_us')
+    # reply_to_message_id = update.message.message_id
 
 
 def website(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="https://nayziclinic.com")
-    user_handler(update.message.chat.id, update.message.chat.username, action='get_contact_us')
 
 
 def contact_us(update, context):
     context.bot.send_contact(chat_id=update.effective_chat.id, first_name='کلینیک زیبایی نای ذی',
                              phone_number=+982191001919)
-    user_handler(update.message.chat.id, update.message.chat.username, action='get_contact_us')
 
 
-# def button(update, context):
-#     keyboard = [[InlineKeyboardButton("Option 1", callback_data='1'),
-#                  InlineKeyboardButton("Option 2", callback_data='2')],
-#
-#                 [InlineKeyboardButton("Option 3", callback_data='3')]]
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-#     update.message.reply_text('Please choose:', reply_markup=reply_markup)
+def end_send_image(update, context):
+    update.message.reply_text(
+        text="در خواست سرویس شما با موفقیت ثبت شد.",
+        reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS['MENU'],
+                                         one_time_keyboard=True)
+    )
+    get_contact_user(update, context)
+
+
+def next_send_image(update, context):
+    update.message.reply_text(
+        text="خب حالا عکس بعدیو بده عمو ببینه",
+        reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS['NEXT'],
+                                         one_time_keyboard=True)
+    )
 
 
 def service(update, _):
-    # user = User.objects.get(telegram_id=update.message.chat.id)
     batch_size = 2
     services = Service.objects.all()
 
@@ -127,16 +201,6 @@ def service(update, _):
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(text='خدماتی که می خوای رو انتخاب کن:', reply_markup=reply_markup)
-    # UserActivity.objects.log_user_select_popular_stories(user=user)
-
-
-def reply_photo_to_stickers(update, context):
-    if update.message.photo:
-        new_file = context.bot.get_file(update.message.photo[-1].file_id)
-        rand = randint(0, 99999999)
-
-        new_file.download('user_reply_to_stickers_' + str(update.effective_chat.id) + '_' + str(rand) + '.jpg')
-        context.bot.send_message(chat_id=update.effective_chat.id, text="https://nayziclinic.com")
 
 
 class AddressFilter(BaseFilter):
@@ -164,6 +228,16 @@ class ServiceFilter(BaseFilter):
         return 'خدمات' == message.text
 
 
+class EndSendImageFilter(BaseFilter):
+    def filter(self, message):
+        return 'تمام شد' == message.text
+
+
+class NextSendImageFilter(BaseFilter):
+    def filter(self, message):
+        return 'بعدی' == message.text
+
+
 class Command(BaseCommand):
     def handle(self, *args, **options):
         start_handler = CommandHandler('start', start)
@@ -182,7 +256,10 @@ class Command(BaseCommand):
         service_handler_text = MessageHandler(ServiceFilter(), service)
         dispatcher.add_handler(service_handler_text)
 
-        dispatcher.add_handler(MessageHandler(Filters.photo, reply_photo_to_stickers))
+        end_send_image_handler_text = MessageHandler(EndSendImageFilter(), end_send_image)
+        dispatcher.add_handler(end_send_image_handler_text)
+        next_send_image_handler_text = MessageHandler(NextSendImageFilter(), next_send_image)
+        dispatcher.add_handler(next_send_image_handler_text)
 
         updater.start_polling()
         updater.idle()

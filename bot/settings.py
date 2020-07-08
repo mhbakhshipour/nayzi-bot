@@ -189,6 +189,7 @@ STATICFILES_DIRS = [
 UPLOAD_DIRECTORIES = {
     'service_sticker': 'service_sticker',
     'user_photo': 'user_photo',
+    'user_service_image': 'user_service_image',
 }
 
 AUTH_USER_MODEL = 'core.User'
