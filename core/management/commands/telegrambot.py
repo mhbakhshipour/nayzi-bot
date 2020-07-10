@@ -1,9 +1,5 @@
-import re
-from random import randint
-from time import sleep
-
 from django.core.management import BaseCommand
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import CallbackQueryHandler, MessageHandler, BaseFilter, Filters
 from telegram.ext import Updater, CommandHandler
 import logging
@@ -70,11 +66,39 @@ def update_question(response, query):
 
 
 def get_contact_user(update, context):
-    # context.bot.send_message(chat_id=update.effective_chat.id, text="شماره و ایمیلتو تو 2 تا پیام بده عمو ببینه")
-    dispatcher.add_handler(MessageHandler(Filters.regex('^09[0-9]{9}$'), get_cellphone_number))
+    user = User.objects.filter(telegram_id=update.message.chat.id)
+    u = User.objects.get(telegram_id=update.message.chat.id)
+    if u.name is None:
+        def get_name_user():
+            user.update(
+                name=update.message.chat.first_name if not None else '' + update.message.chat.last_name if not None else '')
+            update.message.reply_text(text="کارشناسان ما بزودی با شما تماس خواهند گرفت",
+                                      reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS['MENU'],
+                                                                       one_time_keyboard=True))
 
-    dispatcher.add_handler(
-        MessageHandler(Filters.regex('^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'), get_email_address))
+        def get_city_user(update, context):
+            user.update(city=update.message.text)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="شهر شما ثبت شد")
+            get_name_user()
+
+        def get_age_user(update, context):
+            user.update(age=update.message.text)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="سن شما ثبت شد")
+            context.bot.send_message(chat_id=update.effective_chat.id, text="لطفا شهر خود را ارسال کنید")
+            dispatcher.add_handler(MessageHandler(Filters.text, get_city_user))
+
+        def get_mobile_number(update, context):
+            user.update(mobile=update.message.text)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="شماره شما ثبت شد")
+            context.bot.send_message(chat_id=update.effective_chat.id, text="لطفا سن خود را ارسال کنید")
+            dispatcher.add_handler(MessageHandler(Filters.regex('^[1-9][0-9]{1}$'), get_age_user))
+
+        context.bot.send_message(chat_id=update.effective_chat.id, text="لطفا شماره خود را با 09 ارسال کنید")
+        dispatcher.add_handler(MessageHandler(Filters.regex('^09[0-9]{9}$'), get_mobile_number))
+    else:
+        update.message.reply_text(text="کارشناسان ما بزودی با شما تماس خواهند گرفت",
+                                  reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS['MENU'],
+                                                                   one_time_keyboard=True))
 
 
 def user_request_service(update, context, user, service, service_sticker_count):
@@ -104,7 +128,6 @@ def user_request_service(update, context, user, service, service_sticker_count):
             context.bot.send_sticker(chat_id=update.effective_chat.id, sticker=i.image)
         context.bot.send_message(chat_id=update.effective_chat.id,
                                  text="عکس هایی تو این زاویه که فرستادیم برات از خودت بگیر و همینجا بفرس برامون \n وقتی فرستادی روی بعدی/تمام شد بزن")
-        # get_image(update, context, service_sticker_count, user_service, update.callback_query.data)
 
     if UserService.objects.filter(user=user, services=service).exists() is True:
         user_service = UserService.objects.get(user=user, services=service)
@@ -135,29 +158,13 @@ def inline_query(update, context):
         # update.callback_query.answer()
 
 
-def get_cellphone_number(update, context):
-    if update.message.text:
-        context.bot.send_message(chat_id=update.effective_chat.id, text="ای جان اینم شماره")
-
-
-def get_email_address(update, context):
-    if update.message.text:
-        context.bot.send_message(chat_id=update.effective_chat.id, text="ای جان اینم ایمیل")
-
-
 def address(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="بلوار آفریقا - خیابان شریفی - پ19 - ط2")
     context.bot.send_location(chat_id=update.effective_chat.id, latitude=35.759400, longitude=51.412237)
 
 
 def instagram(update, context):
-    # query = update.callback_query
-    # contact_keyboard = KeyboardButton(text="شمارمو بده عمو", request_contact=True)
-    # reply_markup = ReplyKeyboardMarkup([[contact_keyboard]])
-    # update.message.reply_text("شمارتو بده عمو ببینه", reply_markup=reply_markup)
-    # print(update.message.contact.phone_number)
     context.bot.send_message(chat_id=update.effective_chat.id, text="https://instagram.com/nayziclinic")
-    # reply_to_message_id = update.message.message_id
 
 
 def website(update, context):
@@ -170,17 +177,14 @@ def contact_us(update, context):
 
 
 def end_send_image(update, context):
-    update.message.reply_text(
-        text="در خواست سرویس شما با موفقیت ثبت شد.",
-        reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS['MENU'],
-                                         one_time_keyboard=True)
-    )
+    context.bot.send_message(text='در خواست سرویس شما با موفقیت ثبت شد.', chat_id=update.message.chat_id,
+                             reply_markup=ReplyKeyboardRemove())
     get_contact_user(update, context)
 
 
 def next_send_image(update, context):
     update.message.reply_text(
-        text="خب حالا عکس بعدیو بده عمو ببینه",
+        text="لطفا عکس بعدی را ارسال کنید",
         reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS['NEXT'],
                                          one_time_keyboard=True)
     )
