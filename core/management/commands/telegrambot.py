@@ -5,6 +5,7 @@ from telegram.ext import Updater, CommandHandler
 import logging
 from bot import settings
 from core.models import Service, User, UserActivity, UserService, UserServiceImage
+from PIL import Image
 
 updater = Updater(settings.bot, use_context=True)
 dispatcher = updater.dispatcher
@@ -102,23 +103,49 @@ def get_contact_user(update, context):
 
 
 def user_request_service(update, context, user, service, service_sticker_count):
+    def check_similar_user_photo(user_image, service):
+        for i in service.images.all():
+            i1 = Image.open(i.image)
+            i2 = Image.open(user_image)
+            # assert i1.mode == i2.mode, "Different kinds of images."
+            # assert i1.size == i2.size, "Different sizes."
+
+            pairs = zip(i1.getdata(), i2.getdata())
+            if len(i1.getbands()) == 1:
+                # for gray-scale jpegs
+                dif = sum(abs(p1 - p2) for p1, p2 in pairs)
+            else:
+                dif = sum(abs(c1 - c2) for p1, p2 in pairs for c1, c2 in zip(p1, p2))
+
+            ncomponents = i1.size[0] * i1.size[1] * 3
+            print("Difference (percentage):", (dif / 255.0 * 100) / ncomponents)
+            if int((dif / 255.0 * 100) / ncomponents) > 20:
+                return False
+            else:
+                return True
+
     def reply_photo_to_stickers(update, context):
         if update.message.photo:
             user_service = UserService.objects.get(user=user, services=service)
 
             new_file = context.bot.get_file(update.message.photo[-1].file_id)
             i = new_file.download('medias/user_service_image/' + str(update.effective_chat.id) + '.jpg')
-            img = UserServiceImage.objects.create(image=i.split('medias/')[1])
-            user_service.images.add(img)
 
-            user_service = UserService.objects.get(user=user, services=service)
-            user_service_image_count = len(user_service.images.all())
-            context.bot.send_message(chat_id=update.effective_chat.id,
-                                     text="عکس شما دریافت شد. لطفا روی دکمه بزنید",
-                                     reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS[
-                                                                          'COMPLETED' if user_service_image_count == service_sticker_count else 'NEXT'],
-                                                                      one_time_keyboard=True)
-                                     )
+            if check_similar_user_photo(i, service) is True:
+                user_service = UserService.objects.get(user=user, services=service)
+                img = UserServiceImage.objects.create(image=i.split('medias/')[1])
+                user_service.images.add(img)
+                user_service_image_count = len(user_service.images.all())
+
+                context.bot.send_message(chat_id=update.effective_chat.id,
+                                         text="عکس شما دریافت شد. لطفا روی دکمه بزنید",
+                                         reply_markup=ReplyKeyboardMarkup(KEYBOARD_MARKUPS[
+                                                                              'COMPLETED' if user_service_image_count == service_sticker_count else 'NEXT'],
+                                                                          one_time_keyboard=True)
+                                         )
+            else:
+                context.bot.send_message(chat_id=update.effective_chat.id,
+                                         text="عکس شما مطابق الگو نیست. لطفا مجددا تلاش کنید")
 
     def send_stickers():
         update_question(service.title, update.callback_query)

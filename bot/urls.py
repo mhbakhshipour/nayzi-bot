@@ -20,7 +20,13 @@ from django.urls import path, include
 
 from bot import settings
 
+admin.site.site_header = 'پنل ربات نای ذی'
+admin.site.site_title = 'پنل ربات نای ذی'
+admin.site.index_title = 'پنل ربات نای ذی'
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    url(r'^', include('django_telegrambot.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+                  path('admin/', admin.site.urls),
+                  url(r'^', include('django_telegrambot.urls')),
+              ] + static(settings.STATIC_URL,
+                         document_root=settings.STATICFILES_DIRS) + static(settings.MEDIA_URL,
+                                                                           document_root=settings.MEDIA_ROOT)
