@@ -17,16 +17,19 @@ from django.conf.urls import url
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
-
+from core.urls import urlpatterns as core_urls
 from bot import settings
 
 admin.site.site_header = 'پنل ربات نای ذی'
 admin.site.site_title = 'پنل ربات نای ذی'
 admin.site.index_title = 'پنل ربات نای ذی'
 
+
 urlpatterns = [
                   path('admin/', admin.site.urls),
+                  *core_urls,
                   url(r'^', include('django_telegrambot.urls')),
+                  url(r'^api-auth/', include('rest_framework.urls'))
               ] + static(settings.STATIC_URL,
                          document_root=settings.STATICFILES_DIRS) + static(settings.MEDIA_URL,
                                                                            document_root=settings.MEDIA_ROOT)

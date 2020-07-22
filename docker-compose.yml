@@ -1,0 +1,35 @@
+version: '3'
+
+networks:
+  nayzi_bot:
+    driver: bridge
+
+services:
+  mysql:
+    image: mysql:5.7
+    restart: always
+    ports:
+      - '3309:3306'
+    environment:
+      MYSQL_DATABASE: 'nayzi_bot'
+      MYSQL_USER: 'nayzi'
+      MYSQL_PASSWORD: 'rMZew4dBbzHastXP'
+      MYSQL_ROOT_PASSWORD: 'rMZew4dBbzHastXP'
+    volumes:
+      - mysql-data-volume:/var/lib/mysql
+    networks:
+      - nayzi_bot
+
+  backend:
+    build: .
+    restart: always
+    ports:
+      - '8585:8000'
+    command: bash -c "export environment=docker.env && python manage.py migrate && python manage.py runserver 0.0.0.0:8000 && python manage.py telegrambot"
+    depends_on:
+      - mysql
+    networks:
+      - nayzi_bot
+
+volumes:
+  mysql-data-volume:

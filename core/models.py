@@ -5,7 +5,7 @@ from django.contrib.auth.models import PermissionsMixin
 from django.db import models
 from django.db.models import Manager
 from django.utils.translation import ugettext as _
-
+from jalali_date import datetime2jalali
 from bot import settings
 
 
@@ -63,6 +63,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = []
+
+    def jalali_date_joined(self):
+        return datetime2jalali(self.date_joined).strftime('%y/%m/%d')
 
     class Meta:
         db_table = 'users'
@@ -148,13 +151,26 @@ class Service(models.Model):
 
 
 class UserService(models.Model):
+    status_choices = (
+        (0, _('unread')),
+        (1, _('unknown')),
+        (2, _('in_progress')),
+        (3, _('reserved')),
+        (4, _('no_answer')),
+        (5, _('other'))
+    )
+
     user = models.ForeignKey(to="User", on_delete=models.CASCADE, verbose_name=_('user'))
     services = models.ForeignKey(to="Service", on_delete=models.CASCADE, verbose_name=_('services'))
     images = models.ManyToManyField(verbose_name=_('images'), to="UserServiceImage", related_name='user_service_image')
+    status = models.SmallIntegerField(_('status'), default=0, choices=status_choices)
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
 
     def __str__(self):
         return self.user.username + 'سرویس: ' + self.services.title
+
+    def jalali_created_at(self):
+        return datetime2jalali(self.created_at).strftime('%y/%m/%d')
 
     class Meta:
         db_table = 'user_services'

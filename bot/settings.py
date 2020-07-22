@@ -14,6 +14,7 @@ import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import sys
+from datetime import timedelta
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,66 +25,20 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '&$@e#3^m80)py1$%n*741r9gi*rohwie#1meuhixf-@_857cy!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = bool(os.environ.get('DEBUG'))
 
-ALLOWED_HOSTS = []
-bot = '1249876167:AAEqaCiT4vEYyHuVUBnJPAHm3xY0crzjE1s'
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+bot = os.environ.get('BOT_TOKEN')
 DJANGO_TELEGRAMBOT = {
-
-    'MODE': 'POLLING',  # (Optional [str]) # The default value is WEBHOOK,
-    # otherwise you may use 'POLLING'
-    # NB: if use polling you must provide to run
-    # a management command that starts a worker
-
+    'MODE': 'POLLING',
     'WEBHOOK_SITE': 'http://localhost',
-    'WEBHOOK_PREFIX': '/prefix',  # (Optional[str]) # If this value is specified,
-    # a prefix is added to webhook url
-
-    # 'WEBHOOK_CERTIFICATE' : 'cert.pem', # If your site use self-signed
-    # certificate, must be set with location of your public key
-    # certificate.(More info at https://core.telegram.org/bots/self-signed )
-
+    'WEBHOOK_PREFIX': '/prefix',
     'BOTS': [
         {
-            'TOKEN': '1249876167:AAEqaCiT4vEYyHuVUBnJPAHm3xY0crzjE1s',  # Your bot token.
-
-            # 'ALLOWED_UPDATES':(Optional[list[str]]), # List the types of
-            # updates you want your bot to receive. For example, specify
-            # ``["message", "edited_channel_post", "callback_query"]`` to
-            # only receive updates of these types. See ``telegram.Update``
-            # for a complete list of available update types.
-            # Specify an empty list to receive all updates regardless of type
-            # (default). If not specified, the previous setting will be used.
-            # Please note that this parameter doesn't affect updates created
-            # before the call to the setWebhook, so unwanted updates may be
-            # received for a short period of time.
-
-            # 'TIMEOUT':(Optional[int|float]), # If this value is specified,
-            # use it as the read timeout from the server
-
-            # 'WEBHOOK_MAX_CONNECTIONS':(Optional[int]), # Maximum allowed number of
-            # simultaneous HTTPS connections to the webhook for update
-            # delivery, 1-100. Defaults to 40. Use lower values to limit the
-            # load on your bot's server, and higher values to increase your
-            # bot's throughput.
-
-            # 'POLL_INTERVAL' : (Optional[float]), # Time to wait between polling updates from Telegram in
-            # seconds. Default is 0.0
-
-            # 'POLL_CLEAN':(Optional[bool]), # Whether to clean any pending updates on Telegram servers before
-            # actually starting to poll. Default is False.
-
-            # 'POLL_BOOTSTRAP_RETRIES':(Optional[int]), # Whether the bootstrapping phase of the `Updater`
-            # will retry on failures on the Telegram server.
-            # |   < 0 - retry indefinitely
-            # |     0 - no retries (default)
-            # |   > 0 - retry up to X times
-
-            # 'POLL_READ_LATENCY':(Optional[float|int]), # Grace time in seconds for receiving the reply from
-            # server. Will be added to the `timeout` value and used as the read timeout from
-            # server (Default: 2).
+            'TOKEN': os.environ.get('BOT_TOKEN'),
         },
-        # Other bots here with same structure.
     ],
 
 }
@@ -98,7 +53,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_telegrambot',
-    'core'
+    'core',
+    'rest_framework',
+    'corsheaders',
+    'jalali_date',
 ]
 
 MIDDLEWARE = [
@@ -109,14 +67,33 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
+
+JALALI_DATE_DEFAULTS = {
+    'Strftime': {
+        'date': '%y/%m/%d',
+        'datetime': '%H:%M:%S _ %y/%m/%d',
+    },
+    'Static': {
+        'js': [
+            'admin/js/django_jalali.min.js',
+        ],
+        'css': {
+            'all': [
+                'admin/jquery.ui.datepicker.jalali/themes/base/jquery-ui.min.css',
+            ]
+        }
+    },
+}
 
 ROOT_URLCONF = 'bot.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -137,13 +114,12 @@ WSGI_APPLICATION = 'bot.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'nayzi_bot',
-        'USER': 'root',
-        'PASSWORD': '15015',
-        'HOST': 'localhost'
+        'NAME': str(os.environ.get('DB_NAME')),
+        'USER': str(os.environ.get('DB_USER')),
+        'HOST': str(os.environ.get('DB_HOST')),
+        'PASSWORD': str(os.environ.get('DB_PASSWORD'))
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
@@ -196,7 +172,6 @@ STATICFILES_DIRS = [
 
 LOCALE_PATHS = (os.path.join(BASE_DIR, 'locale'),)
 
-
 UPLOAD_DIRECTORIES = {
     'service_sticker': 'service_sticker',
     'user_photo': 'user_photo',
@@ -205,3 +180,74 @@ UPLOAD_DIRECTORIES = {
 
 AUTH_USER_MODEL = 'core.User'
 
+WHITELIST_STRIP_TAG_PARAMETERS = []
+
+CORS_ORIGIN_WHITELIST = [
+    "http://localhost",
+    "http://127.0.0.1",
+]
+# CORS_ORIGIN_ALLOW_ALL = True
+LOGGING = {
+    'version': 1,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+        },
+        'transaction': {
+            'format': '%(asctime)s : %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'formatter': 'verbose',
+            'filename': os.path.join(BASE_DIR, 'debug.log')
+        },
+        'transactions_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'formatter': 'transaction',
+            'filename': os.path.join(BASE_DIR, 'transactions.log')
+        },
+    },
+    'loggers': {
+        'app': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'transaction': {
+            'handlers': ['transactions_file'],
+            'level': 'DEBUG',
+            'propagates': True
+        },
+        'django.request': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django.security': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        }
+    }
+}
+
+REST_FRAMEWORK = {
+    'EXCEPTION_HANDLER': 'bot.exceptions.custom_rest_exception_handler',
+    'DEFAULT_PERMISSION_CLASSES': [],
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework_simplejwt.authentication.JWTAuthentication']
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(weeks=100),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=200),
+}
