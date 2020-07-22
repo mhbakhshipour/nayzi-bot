@@ -26,6 +26,11 @@ services:
     ports:
       - '8585:8000'
     command: ./run.sh
+    env_file:
+      - ./bot/docker.env
+      environment:
+        - "PYTHONUNBUFFERED=1"
+        - "LOAD_ENV=False"
     depends_on:
       - mysql
     networks:
