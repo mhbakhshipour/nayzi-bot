@@ -15,6 +15,7 @@ from core.serializers import UserServiceListSerializer, UserServiceDetailSeriali
 
 
 class UserServiceView(ExpressiveListModelMixin, generics.ListAPIView):
+    permission_classes = (IsAuthenticated,)
     serializer_class = UserServiceListSerializer
     plural_name = 'user_list'
 
