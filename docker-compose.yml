@@ -25,7 +25,7 @@ services:
     restart: always
     ports:
       - '8585:8000'
-    command: bash -c "export environment=docker.env && python manage.py migrate && python manage.py telegrambot"
+    command: bash -c "export environment=docker.env && python manage.py migrate && python manage.py runserver && python manage.py runserver"
     depends_on:
       - mysql
     networks:
