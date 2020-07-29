@@ -25,18 +25,12 @@ services:
     restart: always
     ports:
       - '8585:8000'
-    command: bash -c "export environment=docker.env && python manage.py migrate && python manage.py runserver"
-    depends_on:
-      - mysql
-    networks:
-      - nayzi_bot
-
-  telegram:
-    build: .
-    restart: always
-    ports:
-      - '8181:8000'
-    command: bash -c "export environment=docker.env && python manage.py telegrambot"
+    command: ./run.sh
+    env_file:
+      - ./bot/docker.env
+    environment:
+      - "PYTHONUNBUFFERED=1"
+      - "LOAD_ENV=False"
     depends_on:
       - mysql
     networks:
