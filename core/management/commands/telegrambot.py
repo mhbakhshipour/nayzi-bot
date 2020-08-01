@@ -119,7 +119,7 @@ def user_request_service(update, context, user, service, service_sticker_count):
 
             ncomponents = i1.size[0] * i1.size[1] * 3
             print("Difference (percentage):", (dif / 255.0 * 100) / ncomponents)
-            if int((dif / 255.0 * 100) / ncomponents) > 20:
+            if int((dif / 255.0 * 100) / ncomponents) > 35:
                 return False
             else:
                 return True
