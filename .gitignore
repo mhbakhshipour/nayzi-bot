@@ -3,4 +3,4 @@
 *.pyc
 medias
 *.log
-*.env
+# *.env
