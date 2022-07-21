@@ -26,7 +26,7 @@ admin.site.index_title = 'پنل ربات نای ذی'
 
 
 urlpatterns = [
-                  path('admin/', admin.site.urls),
+                  path('nayzibotadminpanel/', admin.site.urls),
                   *core_urls,
                   url(r'^', include('django_telegrambot.urls')),
                   url(r'^api-auth/', include('rest_framework.urls'))

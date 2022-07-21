@@ -119,7 +119,7 @@ def user_request_service(update, context, user, service, service_sticker_count):
 
             ncomponents = i1.size[0] * i1.size[1] * 3
             print("Difference (percentage):", (dif / 255.0 * 100) / ncomponents)
-            if int((dif / 255.0 * 100) / ncomponents) > 20:
+            if int((dif / 255.0 * 100) / ncomponents) > 51:
                 return False
             else:
                 return True
@@ -129,7 +129,7 @@ def user_request_service(update, context, user, service, service_sticker_count):
             user_service = UserService.objects.get(user=user, services=service)
 
             new_file = context.bot.get_file(update.message.photo[-1].file_id)
-            i = new_file.download('medias/user_service_image/' + str(update.effective_chat.id) + '.jpg')
+            i = new_file.download('/nayzi_bot/medias/user_service_image/' + str(update.effective_chat.id) + '.jpg')
 
             if check_similar_user_photo(i, service) is True:
                 user_service = UserService.objects.get(user=user, services=service)
